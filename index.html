@@ -135,6 +135,17 @@
     min-width: 32px;
     text-align: right;
   }
+  .ctrl select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+  }
 
   /* RUN BUTTON */
   .run-btn {
@@ -273,6 +284,10 @@
   <!-- CONTROLS -->
   <div class="controls">
     <div class="ctrl">
+      <label for="sensorSelect">Sensor</label>
+      <select id="sensorSelect"></select>
+    </div>
+    <div class="ctrl">
       <label>Window size (pts)</label>
       <div class="ctrl-inner">
         <input type="range" id="window" min="2" max="48" step="1" value="8">
@@ -297,7 +312,7 @@
   <div class="panel" id="signalPanel" style="display:none;">
     <div class="panel-title">Original signal · area from y=0 · change points</div>
     <div class="legend">
-      <div class="leg"><span class="leg-sq" style="background:#00d4ff;"></span> PM_N</div>
+      <div class="leg"><span class="leg-sq" style="background:#00d4ff;"></span> <span id="signalLegendLabel">PM_N</span></div>
       <div class="leg"><span class="leg-sq" style="background:rgba(0,212,255,0.18);"></span> Area fill</div>
       <div class="leg"><span class="leg-line" style="border-color:#ff4d6d;"></span> Change point</div>
       <div class="leg"><span class="leg-line" style="border-color:#a8ff78;border-top-style:solid;"></span> Segment mean</div>
@@ -359,6 +374,7 @@ const PALETTE = [
   '#00d4ff','#ff4d6d','#a8ff78','#f7b731','#a29bfe',
   '#fd79a8','#00b894','#e17055','#74b9ff','#55efc4'
 ];
+const SENSOR_OPTIONS = ['PM_N', 'NOX_N', 'SOX_N', 'TOC_N', 'HCL_N', 'NH3_N', 'CO_N', 'Hg_N'];
 
 // ─── UTILS ──────────────────────────────────────────────────────────
 function parseDate(str) {
@@ -542,22 +558,32 @@ function segmentStats(values, timeSec, timestamps, changePoints) {
 let csvData = null;
 let charts  = {};
 
+function sensorStatusColumn(sensorValCol) {
+  return sensorValCol.replace(/_N$/, '_status');
+}
+
+function updateSensorLabels(sensorValCol) {
+  document.getElementById('signalLegendLabel').textContent = sensorValCol;
+  document.getElementById('signalChart').setAttribute('aria-label', `${sensorValCol} signal with change points and segment means`);
+  document.getElementById('barChart').setAttribute('aria-label', `Bar chart of mean ${sensorValCol} per segment`);
+}
+
 function destroyChart(id) {
   if (charts[id]) { charts[id].destroy(); delete charts[id]; }
 }
 
 // ─── CSV PARSE ───────────────────────────────────────────────────────
-function parseCSV(text, dateCol, valCol, rdlStatusCol, pmStatusCol) {
+function parseCSV(text, dateCol, sensorValCol, sensorStatusCol, rdlStatusCol) {
   const lines = text.trim().split('\n');
   const header = lines[0].split(',').map(h=>h.trim());
   const di = header.indexOf(dateCol);
-  const vi = header.indexOf(valCol);
+  const vi = header.indexOf(sensorValCol);
   const rdl_s = header.indexOf(rdlStatusCol);
-  const pm_s = header.indexOf(pmStatusCol);
+  const sensor_s = header.indexOf(sensorStatusCol);
   if (di < 0) throw new Error(`Column "${dateCol}" not found. Available: ${header.join(', ')}`);
-  if (vi < 0) throw new Error(`Column "${valCol}" not found. Available: ${header.join(', ')}`);
+  if (vi < 0) throw new Error(`Column "${sensorValCol}" not found. Available: ${header.join(', ')}`);
   if (rdl_s < 0) throw new Error(`Column "${rdlStatusCol}" not found. Available: ${header.join(', ')}`);
-  if (pm_s < 0) throw new Error(`Column "${pmStatusCol}" not found. Available: ${header.join(', ')}`);
+  if (sensor_s < 0) throw new Error(`Column "${sensorStatusCol}" not found. Available: ${header.join(', ')}`);
 
   const timestamps = [], values = [];
   for (let i = 1; i < lines.length; i++) {
@@ -565,8 +591,8 @@ function parseCSV(text, dateCol, valCol, rdlStatusCol, pmStatusCol) {
     if (parts.length < 2) continue;
     
     const hasRdl95 = parseFloat(parts[rdl_s]) === 95;
-    const hasPm1 =  parseFloat(parts[pm_s]) === 1;
-    if (!hasRdl95 || !hasPm1) continue; // skip rows that don't meet RDL and PM status criteria
+    const hasStatus1 =  parseFloat(parts[sensor_s]) === 1;
+    if (!hasRdl95 || !hasStatus1) continue; // skip rows that don't meet RDL and Sensor status criteria
 
     const dt = parseDate(parts[di]);
     const v  = parseFloat(parts[vi]);
@@ -596,15 +622,17 @@ function setStatus(msg, type='ok') {
 async function run() {
   const winSize = parseInt(document.getElementById('window').value);
   const penVal  = parseFloat(document.getElementById('penalty').value);
-  const valCol  = 'PM_N';//document.getElementById('colName').value.trim();
+  const sensorValCol = document.getElementById('sensorSelect').value;
+  const sensorStatusCol = sensorStatusColumn(sensorValCol);
   const dateCol = 'timestamp_real';//document.getElementById('dateCol').value.trim();
-  const rdlStatus = 'RDL_Status';//document.getElementById('rdlStatus').value.trim();
-  const pmStatus = 'PM_status';//document.getElementById('pmStatus').value.trim();
+  const rdlStatusCol = 'RDL_Status';//document.getElementById('rdlStatus').value.trim();
+
 
   setStatus('parsing CSV...', 'wait');
   await new Promise(r => setTimeout(r, 20));
   try {
-    const { timestamps, values } = parseCSV(csvData, dateCol, valCol, rdlStatus, pmStatus);
+    updateSensorLabels(sensorValCol);
+    const { timestamps, values } = parseCSV(csvData, dateCol, sensorValCol, sensorStatusCol, rdlStatusCol);
     const n = values.length;
 
     const t0 = timestamps[0].getTime();
@@ -634,7 +662,7 @@ async function run() {
     });
     document.getElementById('consoleOut').textContent = cons;
 
-    renderAll(timestamps, values, timeSec, areaSignal, deriv, filtered, stats, n, valCol);
+    renderAll(timestamps, values, timeSec, areaSignal, deriv, filtered, stats, n, sensorValCol);
     setStatus(`done · ${filtered.length} change point${filtered.length!==1?'s':''} · ${stats.length} segments`, 'ok');
 
   } catch(e) {
@@ -643,7 +671,7 @@ async function run() {
 }
 
 // ─── RENDER ──────────────────────────────────────────────────────────
-function renderAll(timestamps, values, timeSec, areaSignal, deriv, filtered, stats, n, valCol) {
+function renderAll(timestamps, values, timeSec, areaSignal, deriv, filtered, stats, n, sensorValCol) {
   const labels = timestamps.map(t => fmtDate(t));
   const colors = SEGMENTS_COLORS(stats);
 
@@ -707,7 +735,7 @@ function renderAll(timestamps, values, timeSec, areaSignal, deriv, filtered, sta
       labels,
       datasets: [
         {
-          label: valCol,
+          label: sensorValCol,
           data: values,
           borderColor: '#00d4ff',
           borderWidth: 1.2,
@@ -837,6 +865,12 @@ function handleFile(file) {
   };
   reader.readAsText(file);
 }
+
+const sensorSelect = document.getElementById('sensorSelect');
+sensorSelect.innerHTML = SENSOR_OPTIONS.map(sensor => `<option value="${sensor}">${sensor}</option>`).join('');
+sensorSelect.value = 'PM_N';
+updateSensorLabels(sensorSelect.value);
+sensorSelect.addEventListener('change', e => updateSensorLabels(e.target.value));
 
 document.getElementById('fileInput').addEventListener('change', e => handleFile(e.target.files[0]));
 

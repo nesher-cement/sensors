@@ -113,6 +113,7 @@ function processCsvContent(csvText) {
                 
                 // החלפת פסיק בנקודה בערך ה-TSP
                 const formattedTsp = tsp.replace(',', '.');
+                const numericValue = parseFloat(formattedTsp);
                 // בדיקת התנאים עבור עמודה D (הערך המספרי של TSP)
                 if (!isNaN(numericValue)) {
                     if (numericValue > 500) countGte500++;

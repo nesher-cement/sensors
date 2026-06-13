@@ -53,7 +53,7 @@ async function processFiles() {
                 const newFileName = 'processed_' + entry.name;
                 const newFileHandle = await outputDirectoryHandle.getFileHandle(newFileName, { create: true });
                 const writable = await newFileHandle.createWritable();
-                await writable.write(newContent);
+                await writable.write('\uFEFF' + newContent);
                 await writable.close();
                 
                 processedCount++;

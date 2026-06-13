@@ -28,29 +28,40 @@ async function processFiles() {
         let processedCount = 0;
         let fileCount = 0;
 
-        // לולאה על כל הקבצים בתיקייה
+        // שלב ראשון: ספירת הקבצים המתאימים מראש כדי להציג התקדמות נכונה
+        const entries = [];
         for await (const entry of directoryHandle.values()) {
             if (entry.kind === 'file' && entry.name.endsWith('.csv')) {
-                fileCount++;
-                try {
-                    const file = await entry.getFile();
-                    const text = await file.text();
-                    const newContent = processCsvContent(text);
-                    
-                    // יצירת קובץ חדש בתיקיית הפלט
-                    const newFileName = 'processed_' + entry.name;
-                    const newFileHandle = await outputDirectoryHandle.getFileHandle(newFileName, { create: true });
-                    const writable = await newFileHandle.createWritable();
-                    await writable.write(newContent);
-                    await writable.close();
-                    
-                    processedCount++;
-                    statusDiv.textContent = `מעבד קבצים... ${processedCount} מתוך ${fileCount} הושלמו.`;
+                entries.push(entry);
+            }
+        }
+        fileCount = entries.length;
 
-                } catch (err) {
-                    console.error(`שגיאה בעיבוד הקובץ ${entry.name}:`, err);
-                    statusDiv.textContent = `שגיאה בעיבוד הקובץ ${entry.name}. אנא בדוק את קונסולת המפתחים לפרטים.`;
-                }
+        if (fileCount === 0) {
+            statusDiv.textContent = 'לא נמצאו קבצי CSV בתיקייה שנבחרה.';
+            return;
+        }
+
+        // לולאה על כל הקבצים שנמצאו
+        for (const entry of entries) {
+            try {
+                const file = await entry.getFile();
+                const text = await file.text();
+                const newContent = processCsvContent(text);
+                
+                // יצירת קובץ חדש בתיקיית הפלט
+                const newFileName = 'processed_' + entry.name;
+                const newFileHandle = await outputDirectoryHandle.getFileHandle(newFileName, { create: true });
+                const writable = await newFileHandle.createWritable();
+                await writable.write(newContent);
+                await writable.close();
+                
+                processedCount++;
+                statusDiv.textContent = `מעבד קבצים... ${processedCount} מתוך ${fileCount} הושלמו.`;
+
+            } catch (err) {
+                console.error(`שגיאה בעיבוד הקובץ ${entry.name}:`, err);
+                statusDiv.textContent = `שגיאה בעיבוד הקובץ ${entry.name}. אנא בדוק את קונסולת המפתחים לפרטים.`;
             }
         }
         
@@ -65,7 +76,6 @@ async function processFiles() {
         }
     }
 }
-
 /**
  * מעבד את תוכן ה-CSV ומחזיר את התוכן בפורמט החדש.
  * @param {string} csvText - תוכן קובץ ה-CSV המקורי.
@@ -75,6 +85,14 @@ async function processFiles() {
 function processCsvContent(csvText) {
     const lines = csvText.split('\n');
     const newLines = [];
+    // הגדרת מונים לפי הדרישות עבור עמודה D
+    let countGte500 = 0;
+    let countGte1000 = 0;
+    let countGte1500 = 0;
+    let countGte2000 = 0;
+    let countGte2500 = 0;
+    let countGte3000 = 0;
+    let countGte3500 = 0;
 
     // מתחילים מהשורה השלישית (אינדקס 2) כדי לדלג על שתי שורות הכותרת
     for (let i = 2; i < lines.length; i++) {
@@ -95,13 +113,33 @@ function processCsvContent(csvText) {
                 
                 // החלפת פסיק בנקודה בערך ה-TSP
                 const formattedTsp = tsp.replace(',', '.');
-
+                // בדיקת התנאים עבור עמודה D (הערך המספרי של TSP)
+                if (!isNaN(numericValue)) {
+                    if (numericValue > 500) countGte500++;
+                    if (numericValue > 1000) countGte1000++;
+                    if (numericValue > 1500) countGte1500++;
+                    if (numericValue > 2000) countGte2000++;
+                    if (numericValue > 2500) countGte2500++;
+                    if (numericValue > 3000) countGte3000++;
+                    if (numericValue > 3500) countGte3500++;
+                }
                 // יצירת השורה החדשה בפורמט המבוקש
                 const newRow = `"${device}", ${date}, ${time}, ${formattedTsp}`;
                 newLines.push(newRow);
             }
         }
     }
-    
+    // הוספת שורות רווח לפני טבלת הסיכום כדי להפריד אותה מהנתונים
+    newLines.push("");
+    newLines.push("");
+    newLines.push(`"--- טבלת סיכום מוני עמודה D ---",,,,`);
+    newLines.push(`"קריטריון","מספר מופעים",,,`);
+    newLines.push(`"גדול מ-500", ${countGte500},,,`);
+    newLines.push(`"גדול מ-1000", ${countGte1000},,,`);
+    newLines.push(`"גדול מ-1500", ${countGte1500},,,`);
+    newLines.push(`"גדול מ-2000", ${countGte2000},,,`);
+    newLines.push(`"גדול מ-2500", ${countGte2500},,,`);
+    newLines.push(`"גדול מ-3000", ${countGte3000},,,`);
+    newLines.push(`"גדול מ-3500", ${countGte3500},,,`);
     return newLines.join('\n');
 }

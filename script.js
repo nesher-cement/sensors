@@ -93,6 +93,9 @@ function processCsvContent(csvText) {
     let countGte2500 = 0;
     let countGte3000 = 0;
     let countGte3500 = 0;
+    let countGte4000 = 0;
+    let countGte4500 = 0;
+     let countGte5000 = 0;
 
     // מתחילים מהשורה השלישית (אינדקס 2) כדי לדלג על שתי שורות הכותרת
     for (let i = 2; i < lines.length; i++) {
@@ -123,6 +126,9 @@ function processCsvContent(csvText) {
                     if (numericValue > 2500) countGte2500++;
                     if (numericValue > 3000) countGte3000++;
                     if (numericValue > 3500) countGte3500++;
+                    if (numericValue > 4000) countGte4000++;
+                    if (numericValue > 4500) countGte4500++;
+                    if (numericValue > 5000) countGte5000++;
                 }
                 // יצירת השורה החדשה בפורמט המבוקש
                 const newRow = `"${device}", ${date}, ${time}, ${formattedTsp}`;
@@ -133,7 +139,7 @@ function processCsvContent(csvText) {
     // הוספת שורות רווח לפני טבלת הסיכום כדי להפריד אותה מהנתונים
     newLines.push("");
     newLines.push("");
-    newLines.push(`"--- טבלת סיכום מוני עמודה D ---",,,,`);
+    newLines.push(`"--- טבלת סיכום מוני עמודה  ---",,,,`);
     newLines.push(`"קריטריון","מספר מופעים",,,`);
     newLines.push(`"גדול מ-500", ${countGte500},,,`);
     newLines.push(`"גדול מ-1000", ${countGte1000},,,`);
@@ -142,5 +148,8 @@ function processCsvContent(csvText) {
     newLines.push(`"גדול מ-2500", ${countGte2500},,,`);
     newLines.push(`"גדול מ-3000", ${countGte3000},,,`);
     newLines.push(`"גדול מ-3500", ${countGte3500},,,`);
+    newLines.push(`"גדול מ-4000", ${countGte4000},,,`);
+    newLines.push(`"גדול מ-4500", ${countGte4500},,,`);
+    newLines.push(`"גדול מ-5000", ${countGte5000},,,`);
     return newLines.join('\n');
 }
